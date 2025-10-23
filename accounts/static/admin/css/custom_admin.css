@@ -1,0 +1,518 @@
+/* ==========================================
+   HISAB KITAB - CUSTOM ADMIN STYLES
+   Modern, Clean, and Professional Design
+   ========================================== */
+
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ==================== ROOT VARIABLES ==================== */
+:root {
+    --primary-color: #4f46e5;
+    --primary-dark: #4338ca;
+    --primary-light: #818cf8;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --info-color: #3b82f6;
+
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-hover: #f1f5f9;
+
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --text-light: #94a3b8;
+
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ==================== BASE OVERRIDES ==================== */
+body {
+    font-family: var(--font-family) !important;
+    background: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ==================== HEADER & BRANDING ==================== */
+#header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%) !important;
+    padding: 0 !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.custom-branding {
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#site-name {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1.5rem !important;
+}
+
+#site-name a {
+    color: white !important;
+    text-decoration: none !important;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700 !important;
+}
+
+.brand-icon {
+    font-size: 2rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.brand-text {
+    letter-spacing: -0.025em;
+}
+
+.brand-tagline {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.875rem;
+    margin: 0.25rem 0 0 0;
+    font-weight: 400;
+}
+
+/* ==================== USER LINKS ==================== */
+.custom-userlinks {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.25rem 2rem;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: white;
+    font-weight: 500;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    backdrop-filter: blur(10px);
+}
+
+.user-name {
+    font-size: 0.9375rem;
+}
+
+.custom-userlinks .admin-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-userlinks .admin-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white !important;
+}
+
+.custom-userlinks .logout {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.custom-userlinks .logout:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+/* ==================== CONTENT AREA ==================== */
+#content {
+    padding: 2rem !important;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+#content-main {
+    background: transparent !important;
+}
+
+/* ==================== BREADCRUMBS ==================== */
+.breadcrumbs {
+    background: transparent !important;
+    padding: 0 0 1rem 0 !important;
+    border: none !important;
+    font-size: 0.875rem;
+}
+
+.breadcrumbs a {
+    color: var(--text-secondary) !important;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.breadcrumbs a:hover {
+    color: var(--primary-color) !important;
+}
+
+/* ==================== MODULES & CARDS ==================== */
+.module {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    margin-bottom: 1.5rem !important;
+    overflow: hidden;
+}
+
+.module h2,
+.module caption {
+    background: linear-gradient(to right, var(--bg-hover), var(--bg-card)) !important;
+    color: var(--text-primary) !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    padding: 1rem 1.5rem !important;
+    border-bottom: 2px solid var(--primary-color) !important;
+}
+
+/* ==================== TABLES ==================== */
+#result_list {
+    border: none !important;
+}
+
+#result_list thead th {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    padding: 1rem !important;
+    border-bottom: 2px solid var(--border-color) !important;
+}
+
+#result_list tbody tr {
+    transition: all 0.2s ease;
+}
+
+#result_list tbody tr:hover {
+    background: var(--bg-hover) !important;
+    transform: translateX(4px);
+}
+
+#result_list td,
+#result_list th {
+    padding: 1rem !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* ==================== BADGES & STATUS ==================== */
+.status-badge,
+.role-badge {
+    display: inline-block;
+    padding: 0.375rem 0.875rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.status-active,
+.status-accepted {
+    background: rgba(16, 185, 129, 0.1);
+    color: #065f46;
+}
+
+.status-inactive,
+.status-rejected {
+    background: rgba(239, 68, 68, 0.1);
+    color: #991b1b;
+}
+
+.status-pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #92400e;
+}
+
+.role-superuser {
+    background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+    color: white;
+}
+
+.role-staff {
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary-dark);
+}
+
+.role-user {
+    background: rgba(100, 116, 139, 0.1);
+    color: var(--text-secondary);
+}
+
+.username-badge {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* ==================== AMOUNT DISPLAY ==================== */
+.amount-positive {
+    color: var(--success-color);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.amount-positive::before {
+    content: '+';
+}
+
+.amount-negative {
+    color: var(--danger-color);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.amount-negative::before {
+    content: '-';
+}
+
+/* ==================== BUTTONS ==================== */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border: none !important;
+    padding: 0.625rem 1.25rem !important;
+    border-radius: var(--radius-sm) !important;
+    font-weight: 500 !important;
+    font-size: 0.875rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: var(--shadow-sm) !important;
+    cursor: pointer;
+}
+
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+a.button:hover {
+    background: var(--primary-dark) !important;
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-1px);
+}
+
+.button.default,
+input[type="submit"].default {
+    background: var(--success-color) !important;
+}
+
+.deletelink,
+.deletelink-box a {
+    background: var(--danger-color) !important;
+}
+
+.addlink {
+    background: var(--info-color) !important;
+    padding: 0.625rem 1.25rem !important;
+    border-radius: var(--radius-sm) !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.addlink::before {
+    content: '+';
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* ==================== FORMS ==================== */
+.form-row {
+    padding: 1.25rem 0 !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.form-row:last-child {
+    border-bottom: none !important;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+textarea,
+select {
+    border: 1.5px solid var(--border-color) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.625rem 0.875rem !important;
+    font-size: 0.9375rem !important;
+    transition: all 0.2s ease !important;
+    background: var(--bg-card) !important;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+    outline: none !important;
+}
+
+/* ==================== CHANGE LIST ==================== */
+.change-list .filtered {
+    background: transparent !important;
+}
+
+#changelist {
+    background: transparent !important;
+}
+
+#changelist-filter {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 1.5rem !important;
+}
+
+#changelist-filter h2 {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    margin-bottom: 1rem !important;
+}
+
+#changelist-filter h3 {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+    margin: 1rem 0 0.5rem 0 !important;
+}
+
+#changelist-filter li {
+    padding: 0.5rem 0 !important;
+}
+
+#changelist-filter a {
+    color: var(--text-secondary) !important;
+    text-decoration: none !important;
+    transition: color 0.2s ease;
+}
+
+#changelist-filter a:hover,
+#changelist-filter li.selected a {
+    color: var(--primary-color) !important;
+    font-weight: 500;
+}
+
+/* ==================== PAGINATION ==================== */
+.paginator {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.75rem 1rem !important;
+    margin-top: 1.5rem !important;
+}
+
+.paginator a {
+    color: var(--primary-color) !important;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.paginator a:hover {
+    background: var(--bg-hover);
+}
+
+/* ==================== DASHBOARD ==================== */
+#content-main .module {
+    transition: all 0.3s ease;
+}
+
+#content-main .module:hover {
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-2px);
+}
+
+/* ==================== MESSAGES ==================== */
+.messagelist {
+    padding: 0 !important;
+    margin: 0 0 1.5rem 0 !important;
+}
+
+.messagelist li {
+    padding: 1rem 1.5rem !important;
+    margin: 0 0 0.75rem 0 !important;
+    border-radius: var(--radius-md) !important;
+    border-left: 4px solid !important;
+    font-weight: 500;
+}
+
+.messagelist .success {
+    background: rgba(16, 185, 129, 0.1) !important;
+    border-left-color: var(--success-color) !important;
+    color: #065f46 !important;
+}
+
+.messagelist .warning {
+    background: rgba(245, 158, 11, 0.1) !important;
+    border-left-color: var(--warning-color) !important;
+    color: #92400e !important;
+}
+
+.messagelist .error {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-left-color: var(--danger-color) !important;
+    color: #991b1b !important;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    #content {
+        padding: 1rem !important;
+    }
+
+    .custom-branding,
+    .custom-userlinks {
+        padding: 1rem !important;
+    }
+
+    .custom-userlinks {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}
+
+/* ==================== DARK MODE SUPPORT ==================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-main: #0f172a;
+        --bg-card: #1e293b;
+        --bg-hover: #334155;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --border-color: #334155;
+    }
+}
