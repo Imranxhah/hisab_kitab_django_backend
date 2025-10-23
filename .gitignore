@@ -1,0 +1,18 @@
+# Virtual Environment
+venv/
+/venv/
+*.pyc
+__pycache__/
+db.sqlite3
+*.log
+.DS_Store
+
+# IDE files (add others if you use a different IDE)
+.idea/
+.vscode/
+
+# Django specific
+*.sqlite3
+staticfiles/ # The directory created by collectstatic
+
+# Add any other files/folders you want to ignore
