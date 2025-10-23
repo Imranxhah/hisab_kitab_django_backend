@@ -196,3 +196,74 @@ class FriendTransaction(models.Model):
         # Readable representation
         direction = "owes" if self.amount > 0 else "is owed by"
         return f"{self.initiator.username} -> {self.friend.username}: {abs(self.amount)} ({self.status}) - {self.initiator.username} {direction} {self.friend.username}"
+    
+
+class TransactionDeleteRequest(models.Model):
+    """
+    Model to track requests to delete a specific transaction.
+    Both users must approve before deletion.
+    """
+    class StatusChoices(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    transaction = models.ForeignKey(
+        FriendTransaction,
+        on_delete=models.CASCADE,
+        related_name='delete_requests'
+    )
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='transaction_delete_requests_sent'
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['transaction', 'requester']  # Prevent duplicate requests
+
+    def __str__(self):
+        return f"Delete request for Transaction #{self.transaction.id} by {self.requester.username}"
+
+
+class HistoryResetRequest(models.Model):
+    """
+    Model to track requests to reset transaction history between two friends.
+    Both users must approve before reset.
+    """
+    class StatusChoices(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='history_reset_requests_sent'
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='history_reset_requests_received'
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Reset request from {self.requester.username} to {self.target_user.username}"

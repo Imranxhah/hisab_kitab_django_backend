@@ -5,31 +5,59 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
 
-from .models import Friendship, FriendTransaction
 from .serializers import (
+    LoginSerializer,
     UserSerializer,
     ChangePasswordSerializer,
     FriendshipSerializer,
     FriendshipStatusUpdateSerializer,
     FriendTransactionSerializer,
     TransactionStatusUpdateSerializer,
-    SimpleUserSerializer, # Needed for listing friends
+    SimpleUserSerializer,
+    TransactionDeleteRequestSerializer,      # ← ADD THIS
+    HistoryResetRequestSerializer,           # ← ADD THIS
+    DeleteRequestActionSerializer,           # ← ADD THIS
+    ResetRequestActionSerializer,            # ← ADD THIS
 )
 
-User = get_user_model() # Get our CustomUser model
+from .models import (
+    Friendship,
+    FriendTransaction,
+    TransactionDeleteRequest,  # ← ADD THIS
+    HistoryResetRequest,        # ← ADD THIS
+)
 
-# --- User Views ---
-
+User = get_user_model()
 class UserRegisterView(generics.CreateAPIView):
     """
     API view for user registration.
     Allows anyone to create a new user account.
+    Returns user info and auth token.
     """
     queryset = User.objects.all()
-    permission_classes = [permissions.AllowAny] # Anyone can register
+    permission_classes = [permissions.AllowAny]
     serializer_class = UserSerializer
 
+    def create(self, request, *args, **kwargs):
+        # Call the parent create method
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Get the created user
+        user = serializer.instance
+        
+        # Create or get auth token for the user
+        token, created = Token.objects.get_or_create(user=user)
+        
+        # Return user info with token
+        return Response({
+            'user': UserSerializer(user, context=self.get_serializer_context()).data,
+            'token': token.key
+        }, status=status.HTTP_201_CREATED)
+    
 class ChangePasswordView(generics.UpdateAPIView):
     """
     API view for changing the password of the currently authenticated user.
@@ -270,46 +298,31 @@ class TransactionActionView(generics.UpdateAPIView):
 
 class TransactionHistoryView(generics.ListAPIView):
     """
-    API view to list ACCEPTED transaction history between the authenticated user and a specific friend.
-    Requires the friend's username to be passed as a query parameter (e.g., /api/transactions/history/?friend=friend_username)
+    API view to retrieve transaction history between the authenticated user
+    and a specific friend.
+    Returns all transactions (pending, accepted, rejected) between the two users.
     """
     serializer_class = FriendTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        friend_username = self.request.query_params.get('friend', None)
-
+        friend_username = self.request.query_params.get('friend')
+        
         if not friend_username:
-            # Return empty if no friend specified, or raise an error
-            # raise ValidationError("Friend username query parameter is required.")
-            return FriendTransaction.objects.none()
-
+            raise ValidationError("Friend username must be provided as a query parameter.")
+        
         try:
             friend = User.objects.get(username=friend_username)
         except User.DoesNotExist:
-             # Return empty if friend not found, or raise an error
-            # raise NotFound("Friend user not found.")
-             return FriendTransaction.objects.none()
-
-        # Check if they are actually friends
-        are_friends = Friendship.objects.filter(
-            (Q(requester=user, receiver=friend, status=Friendship.StatusChoices.ACCEPTED) |
-             Q(requester=friend, receiver=user, status=Friendship.StatusChoices.ACCEPTED))
-        ).exists()
-
-        if not are_friends:
-            # raise ValidationError(f"You are not friends with '{friend_username}'.")
-             return FriendTransaction.objects.none()
-
-
-        # Return transactions where the pair (user, friend) are initiator/friend
-        # AND the status is ACCEPTED
-        return FriendTransaction.objects.filter(
-            (Q(initiator=user, friend=friend) | Q(initiator=friend, friend=user)),
-            status=FriendTransaction.StatusChoices.ACCEPTED
-        ).order_by('-updated_at') # Order by most recently updated/accepted
-
+            raise NotFound("Friend not found.")
+        
+        # Get all transactions between the two users (both directions)
+        transactions = FriendTransaction.objects.filter(
+            Q(initiator=user, friend=friend) | Q(initiator=friend, friend=user)
+        ).order_by('-created_at')
+        
+        return transactions
 # --- Optional: View to see transactions YOU initiated that are still pending ---
 class SentPendingTransactionsView(generics.ListAPIView):
     """
@@ -323,3 +336,279 @@ class SentPendingTransactionsView(generics.ListAPIView):
             initiator=self.request.user,
             status=FriendTransaction.StatusChoices.PENDING
         )
+    
+# --- User Login View ---
+class LoginView(generics.GenericAPIView):
+    """
+    API view for user login.
+    Takes username and password, returns an auth token.
+    """
+    permission_classes = [permissions.AllowAny] # Anyone can try to log in
+    serializer_class = LoginSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        
+        # Get or create a token for the user
+        token, created = Token.objects.get_or_create(user=user)
+        
+        # Return the token and user info
+        return Response({
+            "user": UserSerializer(user, context=self.get_serializer_context()).data,
+            "token": token.key
+        }, status=status.HTTP_200_OK)
+    
+
+class UserSearchView(generics.ListAPIView):
+    """
+    API view to search for users by username.
+    Returns a list of users matching the search query.
+    """
+    serializer_class = SimpleUserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        username_query = self.request.query_params.get('username', None)
+        
+        if not username_query:
+            return User.objects.none()
+        
+        # Search for users whose username contains the query (case-insensitive)
+        # Exclude the current user from results
+        return User.objects.filter(
+            username__icontains=username_query
+        ).exclude(
+            id=self.request.user.id
+        ).order_by('username')[:10]
+    
+
+class RequestTransactionDeleteView(generics.CreateAPIView):
+    """
+    API view to request deletion of a specific transaction.
+    Creates a pending delete request that the other user must approve.
+    """
+    serializer_class = TransactionDeleteRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        transaction_id = self.request.data.get('transaction_id')
+        
+        if not transaction_id:
+            raise ValidationError("Transaction ID must be provided.")
+        
+        try:
+            transaction = FriendTransaction.objects.get(id=transaction_id)
+        except FriendTransaction.DoesNotExist:
+            raise NotFound("Transaction not found.")
+        
+        requester = self.request.user
+        
+        # Verify user is part of this transaction
+        if requester not in [transaction.initiator, transaction.friend]:
+            raise ValidationError("You are not part of this transaction.")
+        
+        # Check if a delete request already exists for this transaction
+        existing_request = TransactionDeleteRequest.objects.filter(
+            transaction=transaction,
+            status=TransactionDeleteRequest.StatusChoices.PENDING
+        ).first()
+        
+        if existing_request:
+            raise ValidationError("A delete request already exists for this transaction.")
+        
+        # Create the delete request
+        serializer.save(
+            transaction=transaction,
+            requester=requester,
+            status=TransactionDeleteRequest.StatusChoices.PENDING
+        )
+
+
+class PendingDeleteRequestsView(generics.ListAPIView):
+    """
+    API view to list pending delete requests that require action from the user.
+    """
+    serializer_class = TransactionDeleteRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Get transactions where user is involved
+        user_transactions = FriendTransaction.objects.filter(
+            Q(initiator=user) | Q(friend=user)
+        )
+        
+        # Get delete requests for these transactions where user is NOT the requester
+        return TransactionDeleteRequest.objects.filter(
+            transaction__in=user_transactions,
+            status=TransactionDeleteRequest.StatusChoices.PENDING
+        ).exclude(requester=user)
+
+
+class DeleteRequestActionView(generics.UpdateAPIView):
+    """
+    API view to approve or reject a delete request.
+    If approved, the transaction is permanently deleted.
+    """
+    queryset = TransactionDeleteRequest.objects.all()
+    serializer_class = DeleteRequestActionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Get transactions where user is involved
+        user_transactions = FriendTransaction.objects.filter(
+            Q(initiator=user) | Q(friend=user)
+        )
+        
+        # Can only act on delete requests for their transactions (not created by them)
+        return TransactionDeleteRequest.objects.filter(
+            transaction__in=user_transactions,
+            status=TransactionDeleteRequest.StatusChoices.PENDING
+        ).exclude(requester=user)
+
+    def update(self, request, *args, **kwargs):
+        delete_request = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        
+        if serializer.is_valid(raise_exception=True):
+            new_status = serializer.validated_data['status']
+            delete_request.status = new_status
+            delete_request.save()
+            
+            # If approved, delete the transaction permanently
+            if new_status == TransactionDeleteRequest.StatusChoices.APPROVED:
+                transaction = delete_request.transaction
+                transaction.delete()
+                return Response(
+                    {"detail": "Delete request approved. Transaction deleted."},
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {"detail": "Delete request rejected."},
+                    status=status.HTTP_200_OK
+                )
+
+
+# ============================================
+# History Reset Request Views
+# ============================================
+
+class RequestHistoryResetView(generics.CreateAPIView):
+    """
+    API view to request resetting transaction history with a friend.
+    Creates a pending reset request that the friend must approve.
+    """
+    serializer_class = HistoryResetRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        friend_username = self.request.data.get('friend_username')
+        
+        if not friend_username:
+            raise ValidationError("Friend username must be provided.")
+        
+        try:
+            target_user = User.objects.get(username=friend_username)
+        except User.DoesNotExist:
+            raise NotFound("Friend not found.")
+        
+        requester = self.request.user
+        
+        if requester == target_user:
+            raise ValidationError("You cannot reset history with yourself.")
+        
+        # Check if they are friends
+        are_friends = Friendship.objects.filter(
+            (Q(requester=requester, receiver=target_user, status=Friendship.StatusChoices.ACCEPTED) |
+             Q(requester=target_user, receiver=requester, status=Friendship.StatusChoices.ACCEPTED))
+        ).exists()
+        
+        if not are_friends:
+            raise ValidationError("You are not friends with this user.")
+        
+        # Check if a reset request already exists
+        existing_request = HistoryResetRequest.objects.filter(
+            Q(requester=requester, target_user=target_user) |
+            Q(requester=target_user, target_user=requester),
+            status=HistoryResetRequest.StatusChoices.PENDING
+        ).first()
+        
+        if existing_request:
+            raise ValidationError("A reset request already exists between you and this friend.")
+        
+        # Create the reset request
+        serializer.save(
+            requester=requester,
+            target_user=target_user,
+            status=HistoryResetRequest.StatusChoices.PENDING
+        )
+
+
+class PendingResetRequestsView(generics.ListAPIView):
+    """
+    API view to list pending reset requests received by the user.
+    """
+    serializer_class = HistoryResetRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return HistoryResetRequest.objects.filter(
+            target_user=self.request.user,
+            status=HistoryResetRequest.StatusChoices.PENDING
+        )
+
+
+class ResetRequestActionView(generics.UpdateAPIView):
+    """
+    API view to approve or reject a history reset request.
+    If approved, all ACCEPTED transactions between the two users are deleted.
+    """
+    queryset = HistoryResetRequest.objects.all()
+    serializer_class = ResetRequestActionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return HistoryResetRequest.objects.filter(
+            target_user=self.request.user,
+            status=HistoryResetRequest.StatusChoices.PENDING
+        )
+
+    def update(self, request, *args, **kwargs):
+        reset_request = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        
+        if serializer.is_valid(raise_exception=True):
+            new_status = serializer.validated_data['status']
+            reset_request.status = new_status
+            reset_request.save()
+            
+            # If approved, delete all ACCEPTED transactions between the two users
+            if new_status == HistoryResetRequest.StatusChoices.APPROVED:
+                requester = reset_request.requester
+                target = reset_request.target_user
+                
+                # Find all accepted transactions between them
+                transactions_to_delete = FriendTransaction.objects.filter(
+                    (Q(initiator=requester, friend=target) | 
+                     Q(initiator=target, friend=requester)),
+                    status=FriendTransaction.StatusChoices.ACCEPTED
+                )
+                
+                count = transactions_to_delete.count()
+                transactions_to_delete.delete()
+                
+                return Response(
+                    {"detail": f"History reset approved. {count} transactions deleted."},
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {"detail": "History reset request rejected."},
+                    status=status.HTTP_200_OK
+                )

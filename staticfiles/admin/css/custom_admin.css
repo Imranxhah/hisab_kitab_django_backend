@@ -366,8 +366,6 @@ select {
     font-size: 0.9375rem !important;
     transition: all 0.2s ease !important;
     background: var(--bg-card) !important;
-    color: var(--text-primary) !important;
-    /* <-- ADD THIS LINE */
 }
 
 input[type="text"]:focus,
@@ -517,39 +515,4 @@ select:focus {
         --text-secondary: #94a3b8;
         --border-color: #334155;
     }
-    
-}
-
-
-input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="number"],
-select {
-    border: 1.5px solid var(--border-color) !important;
-    border-radius: var(--radius-sm) !important;
-
-    /* --- THIS IS THE FIX --- */
-    font-size: 0.9375rem !important;
-    /* Restore normal font size */
-    padding: 0 0.875rem !important;
-    /* Remove vertical padding, keep horizontal */
-    height: 2.5rem !important;
-    /* Set a fixed, consistent height */
-    /* --- END FIX --- */
-
-    transition: all 0.2s ease !important;
-    background: var(--bg-card) !important;
-    color: var(--text-primary) !important;
-}
-
-/* Keep textarea separate so it can have variable height and padding */
-textarea {
-    border: 1.5px solid var(--border-color) !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 0.625rem 0.875rem !important;
-    font-size: 0.9375rem !important;
-    transition: all 0.2s ease !important;
-    background: var(--bg-card) !important;
-    color: var(--text-primary) !important;
 }

@@ -1,8 +1,10 @@
+# accounts/serializers.py
+
 from rest_framework import serializers
 from .models import CustomUser, Friendship, FriendTransaction
-from django.contrib.auth import get_user_model, authenticate # Import authenticate
-from django.utils.translation import gettext_lazy as _ # For error messages
-# Get the active User model (our CustomUser)
+from django.contrib.auth import get_user_model, authenticate
+from django.utils.translation import gettext_lazy as _
+from .models import CustomUser, Friendship, FriendTransaction, TransactionDeleteRequest, HistoryResetRequest
 User = get_user_model()
 
 # --- User Serializer ---
@@ -13,14 +15,11 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        # Fields to include in the serialized output
         fields = ['id', 'username', 'first_name', 'last_name', 'password']
-        # Make password write-only (used for creation/update, but not shown in output)
         extra_kwargs = {
             'password': {'write_only': True, 'style': {'input_type': 'password'}}
         }
 
-    # Override create to handle password hashing
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -30,134 +29,217 @@ class UserSerializer(serializers.ModelSerializer):
         )
         return user
 
-    # Optional: Override update if you want to allow password updates via PUT/PATCH
-    # def update(self, instance, validated_data):
-    #     password = validated_data.pop('password', None)
-    #     user = super().update(instance, validated_data)
-    #     if password:
-    #         user.set_password(password)
-    #         user.save()
-    #     return user
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
 
-# --- Simple User Serializer (for nested display) ---
+# --- Simple User Serializer (for nested representations) ---
 class SimpleUserSerializer(serializers.ModelSerializer):
     """
-    A simplified serializer for displaying user info within other serializers
-    (like Friendship or Transaction), showing only essential fields.
+    Simple serializer showing basic user info.
+    Used for nested representations (e.g., in friendship, transactions).
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name'] # Exclude sensitive info like password
+        fields = ['id', 'username', 'first_name', 'last_name']
+        read_only_fields = fields
+
+# --- Change Password Serializer ---
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializer for password change endpoint.
+    """
+    old_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, write_only=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError(_("Old password is incorrect."))
+        return value
+
+    def validate_new_password(self, value):
+        if len(value) < 6:
+            raise serializers.ValidationError(_("New password must be at least 6 characters long."))
+        return value
+
+    def save(self, **kwargs):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user
 
 # --- Friendship Serializer ---
 class FriendshipSerializer(serializers.ModelSerializer):
     """
     Serializer for the Friendship model.
-    Shows nested user details for requester and receiver.
+    Includes nested user information for sender and receiver.
     """
-    # Use the SimpleUserSerializer for nested representation
-    requester = SimpleUserSerializer(read_only=True)
+    sender = SimpleUserSerializer(source='requester', read_only=True)
     receiver = SimpleUserSerializer(read_only=True)
-
-    # Allow setting receiver by username during creation
-    receiver_username = serializers.CharField(write_only=True, required=False) # For sending requests
-
+    receiver_username = serializers.CharField(write_only=True, required=False)
+    
     class Meta:
         model = Friendship
         fields = [
             'id',
-            'requester',
+            'sender',
             'receiver',
+            'receiver_username',
             'status',
             'created_at',
             'updated_at',
-            'receiver_username' # Include the write-only field
         ]
-        read_only_fields = ['requester', 'status', 'created_at', 'updated_at'] # Fields not set directly by client on create
+        read_only_fields = ['id', 'sender', 'receiver', 'created_at', 'updated_at', 'status']
+    
+    def create(self, validated_data):
+        # Remove receiver_username since it's not a model field
+        validated_data.pop('receiver_username', None)
+        return super().create(validated_data)
 
-# --- FriendTransaction Serializer ---
+# --- Friendship Status Update Serializer ---
+class FriendshipStatusUpdateSerializer(serializers.Serializer):
+    """
+    Simple serializer to accept/reject a friend request.
+    """
+    action = serializers.ChoiceField(choices=['accept', 'reject'], required=True)
+
+    def validate(self, attrs):
+        action = attrs.get('action')
+        if action == 'accept':
+            attrs['status'] = Friendship.StatusChoices.ACCEPTED
+        elif action == 'reject':
+            attrs['status'] = Friendship.StatusChoices.REJECTED
+        return attrs
+
+# --- Friend Transaction Serializer ---
 class FriendTransactionSerializer(serializers.ModelSerializer):
     """
-    Serializer for the FriendTransaction model.
-    Shows nested user details for initiator and friend.
+    Serializer for FriendTransaction model.
     """
     initiator = SimpleUserSerializer(read_only=True)
     friend = SimpleUserSerializer(read_only=True)
-    action_taken_by = SimpleUserSerializer(read_only=True, allow_null=True)
-
-    # Allow setting the friend by username during creation
-    friend_username = serializers.CharField(write_only=True, required=False) # For creating transactions
-
+    friend_username = serializers.CharField(write_only=True, required=False)
+    action_taken_by = SimpleUserSerializer(read_only=True)  
+    
     class Meta:
         model = FriendTransaction
         fields = [
             'id',
             'initiator',
             'friend',
+            'friend_username',
             'amount',
             'description',
             'status',
             'created_at',
             'updated_at',
-            'action_taken_by',
-            'friend_username' # Include the write-only field
+            'action_taken_by', 
         ]
-        # Fields not set directly by client on creation/update initially
-        read_only_fields = ['initiator', 'status', 'created_at', 'updated_at', 'action_taken_by']
-
-
-# --- Serializer for Updating Friendship Status (Accept/Reject) ---
-class FriendshipStatusUpdateSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=[
-        Friendship.StatusChoices.ACCEPTED,
-        Friendship.StatusChoices.REJECTED
-    ])
-
-# --- Serializer for Updating Transaction Status (Accept/Reject) ---
+        read_only_fields = ['id', 'initiator', 'friend', 'status', 'created_at', 'updated_at', 'action_taken_by']
+    
+    def create(self, validated_data):
+        # Remove friend_username since it's not a model field
+        validated_data.pop('friend_username', None)
+        return super().create(validated_data)
+    
+# --- Transaction Status Update Serializer ---
 class TransactionStatusUpdateSerializer(serializers.Serializer):
-     status = serializers.ChoiceField(choices=[
-        FriendTransaction.StatusChoices.ACCEPTED,
-        FriendTransaction.StatusChoices.REJECTED
-    ])
-     
-
-class ChangePasswordSerializer(serializers.Serializer):
     """
-    Serializer for password change endpoint.
-    Requires the old password and validates the new password confirmation.
+    Simple serializer to accept/reject a transaction.
     """
-    old_password = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
-    new_password1 = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
-    new_password2 = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
+    action = serializers.ChoiceField(choices=['accept', 'reject'], required=True)
 
-    def validate_old_password(self, value):
-        """
-        Check if the old password provided matches the user's current password.
-        """
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError(_("Your old password was entered incorrectly. Please enter it again."))
-        return value
+    def validate(self, attrs):
+        action = attrs.get('action')
+        if action == 'accept':
+            attrs['status'] = FriendTransaction.StatusChoices.ACCEPTED
+        elif action == 'reject':
+            attrs['status'] = FriendTransaction.StatusChoices.REJECTED
+        return attrs
 
-    def validate(self, data):
-        """
-        Check that the two new password entries match.
-        """
-        if data['new_password1'] != data['new_password2']:
-            raise serializers.ValidationError(_("The two password fields didn't match."))
-        # You could add more password validation logic here (e.g., complexity requirements)
-        # from django.contrib.auth.password_validation import validate_password
-        # try:
-        #     validate_password(data['new_password1'], self.context['request'].user)
-        # except serializers.ValidationError as e:
-        #     raise serializers.ValidationError({'new_password1': e.messages})
-        return data
+# --- Login Serializer ---
+class LoginSerializer(serializers.Serializer):
+    """
+    Serializer for user login.
+    """
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
-    def save(self, **kwargs):
-        """
-        Save the new password for the user.
-        """
-        user = self.context['request'].user
-        user.set_password(self.validated_data['new_password1'])
-        user.save()
-        return user
+    def validate(self, attrs):
+        username = attrs.get('username')
+        password = attrs.get('password')
+
+        if username and password:
+            user = authenticate(
+                request=self.context.get('request'),
+                username=username,
+                password=password
+            )
+            if not user:
+                raise serializers.ValidationError(_('Unable to log in with provided credentials.'))
+        else:
+            raise serializers.ValidationError(_('Must include "username" and "password".'))
+
+        attrs['user'] = user
+        return attrs
+
+class TransactionDeleteRequestSerializer(serializers.ModelSerializer):
+    """
+    Serializer for transaction delete requests.
+    """
+    requester = SimpleUserSerializer(read_only=True)
+    transaction = FriendTransactionSerializer(read_only=True)
+    
+    class Meta:
+        model = TransactionDeleteRequest
+        fields = ['id', 'transaction', 'requester', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'requester', 'status', 'created_at', 'updated_at']
+
+
+class HistoryResetRequestSerializer(serializers.ModelSerializer):
+    """
+    Serializer for history reset requests.
+    """
+    requester = SimpleUserSerializer(read_only=True)
+    target_user = SimpleUserSerializer(read_only=True)
+    
+    class Meta:
+        model = HistoryResetRequest
+        fields = ['id', 'requester', 'target_user', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'requester', 'target_user', 'status', 'created_at', 'updated_at']
+
+
+class DeleteRequestActionSerializer(serializers.Serializer):
+    """
+    Simple serializer to approve/reject delete requests.
+    """
+    action = serializers.ChoiceField(choices=['approve', 'reject'], required=True)
+
+    def validate(self, attrs):
+        action = attrs.get('action')
+        if action == 'approve':
+            attrs['status'] = TransactionDeleteRequest.StatusChoices.APPROVED
+        elif action == 'reject':
+            attrs['status'] = TransactionDeleteRequest.StatusChoices.REJECTED
+        return attrs
+
+
+class ResetRequestActionSerializer(serializers.Serializer):
+    """
+    Simple serializer to approve/reject reset requests.
+    """
+    action = serializers.ChoiceField(choices=['approve', 'reject'], required=True)
+
+    def validate(self, attrs):
+        action = attrs.get('action')
+        if action == 'approve':
+            attrs['status'] = HistoryResetRequest.StatusChoices.APPROVED
+        elif action == 'reject':
+            attrs['status'] = HistoryResetRequest.StatusChoices.REJECTED
+        return attrs

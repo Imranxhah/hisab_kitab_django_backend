@@ -1,11 +1,18 @@
-# Step 5: Enhanced admin.py with custom styling hooks
+# accounts/admin.py
+
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
-from .models import CustomUser, Friendship, FriendTransaction
+from .models import (
+    CustomUser, 
+    Friendship, 
+    FriendTransaction,
+    TransactionDeleteRequest,
+    HistoryResetRequest,
+)
 
 
 # Custom User Creation Form
@@ -99,10 +106,7 @@ class CustomUserAdmin(UserAdmin):
     filter_horizontal = ('groups', 'user_permissions',)
 
     def username_badge(self, obj):
-        return format_html(
-            '<span class="username-badge">{}</span>',
-            obj.username
-        )
+        return format_html('<span class="username-badge">{}</span>', obj.username)
     username_badge.short_description = 'Username'
 
     def full_name(self, obj):
@@ -200,7 +204,7 @@ class FriendTransactionAdmin(admin.ModelAdmin):
     def amount_display(self, obj):
         color = 'amount-positive' if obj.amount > 0 else 'amount-negative'
         return format_html(
-            '<span class="{}">${}</span>',
+            '<span class="{}">Rs {}</span>',
             color,
             abs(obj.amount)
         )
@@ -223,6 +227,50 @@ class FriendTransactionAdmin(admin.ModelAdmin):
         if obj and obj.status != FriendTransaction.StatusChoices.PENDING:
             return self.readonly_fields + ('initiator', 'friend', 'amount', 'description', 'status', 'action_taken_by')
         return self.readonly_fields
+
+
+
+@admin.register(TransactionDeleteRequest)
+class TransactionDeleteRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'transaction', 'requester', 'status_badge', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['requester__username', 'transaction__id']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def status_badge(self, obj):
+        colors = {
+            'pending': 'status-pending',
+            'approved': 'status-accepted',
+            'rejected': 'status-rejected'
+        }
+        return format_html(
+            '<span class="status-badge {}">{}</span>',
+            colors.get(obj.status, ''),
+            obj.get_status_display()
+        )
+    status_badge.short_description = 'Status'
+
+
+
+@admin.register(HistoryResetRequest)
+class HistoryResetRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'requester', 'target_user', 'status_badge', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['requester__username', 'target_user__username']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def status_badge(self, obj):
+        colors = {
+            'pending': 'status-pending',
+            'approved': 'status-accepted',
+            'rejected': 'status-rejected'
+        }
+        return format_html(
+            '<span class="status-badge {}">{}</span>',
+            colors.get(obj.status, ''),
+            obj.get_status_display()
+        )
+    status_badge.short_description = 'Status'
 
 
 # Customize admin site header and title
